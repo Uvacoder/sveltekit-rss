@@ -1,5 +1,5 @@
 <script context="module" type="ts">
-	import Parser from 'rss-parser/dist/rss-parser';
+	import Parser from 'rss-parser/dist/rss-parser.js';
 
 	interface IFeedItem {
 		title: string;
@@ -27,7 +27,7 @@
 		const feedParam = page.query.get('feed');
 
 		if (feedParam) {
-			const feedFetch = await fetch(feedParam);
+			const feedFetch = await fetch(`/feed.xml?feed=${feedParam}`);
 
 			if (feedFetch.ok) {
 				const feedXml = await feedFetch.text();
@@ -42,10 +42,34 @@
 	}
 </script>
 
-<script>
+<script type="ts">
+	import { browser } from '$app/env';
+
 	import FeedItem from '../components/FeedItem.svelte';
 
 	export let feed;
+
+	interface Fave {
+		uri: string
+		title: string
+	}
+
+	let favorites: Fave[] = browser ? JSON.parse(localStorage.getItem('recentRssFeeds') ||  '[]') : [];
+
+	$: browser && localStorage.setItem('recentRssFeeds', JSON.stringify(favorites));
+
+	$: {
+		if (feed && browser) {
+			const query = new URLSearchParams(location.search);
+			const feedQuery = query.get('feed');
+
+			const newFavorites = favorites.filter(({uri}) => uri !== feedQuery);
+
+			newFavorites.unshift({uri: feedQuery, title: feed.title});
+
+			favorites = newFavorites.slice(0, 9);
+		}
+	}
 </script>
 
 <h1>RSS Reader</h1>
@@ -65,6 +89,17 @@
 		<ul>
 			{#each feed.items as item}
 				<FeedItem {item} />
+			{/each}
+		</ul>
+
+	{/if}
+	{#if favorites.length}
+		<h3>Recents</h3>
+		<ul>
+			{#each favorites as favorite}
+				<li>
+					<a href={`/?feed=${favorite.uri}`}>{favorite.title}</a>
+				</li>
 			{/each}
 		</ul>
 	{/if}
